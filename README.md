@@ -17,9 +17,9 @@ This project is designed to create a tool for processing images on a local termi
 
 ## Install
 
-~~ If you want to use it without any installation, you can download the executable file from the [following path.](./) ~~
+~~If you want to use it without any installation, you can download the executable file from the [following path.](./)~~
 
-~~ However, please note that the initial execution of this executable file is very slow. ~~
+~~However, please note that the initial execution of this executable file is very slow.~~
 
 ### For window (powershell)
 
