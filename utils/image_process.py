@@ -29,9 +29,30 @@ def Flip(img: np.ndarray, vertical: bool, horizontal: bool):
     return cv2.flip(img, 0) if horizontal else _img
 
 
-def Remove_background(img: np.ndarray):
-    return remove(img)
+def Read(img_file: str):
+    return cv2.imread(img_file, cv2.IMREAD_UNCHANGED)
 
 
 def Write(img: np.ndarray, file_path: str, file_name: str):
     cv2.imwrite(Path.Join(file_name, file_path), img)
+
+
+def Remove_background(img: np.ndarray):
+    return remove(img)
+
+
+class Masking():
+    def __init__(self, is_positive: bool = False) -> None:
+        self.mask = np.empty(0)
+        self.is_positive = is_positive
+
+    def Set_mask(self, new_mask: np.ndarray, is_force: bool = True):
+        _this_mask = self.mask
+
+        _is_force = is_force or not _this_mask.shape
+
+        if _is_force or all(new_mask.shape == _this_mask.shape):
+            self.mask = new_mask
+
+    def __call__(self, img: np.ndarray):
+        pass

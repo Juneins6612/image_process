@@ -33,7 +33,7 @@ class App():
 
     def Run(self):
         self.main_window.show()
-        return self.app.exec_()
+        return self.app.exec()
 
 
 if __name__ == "__main__":

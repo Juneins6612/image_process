@@ -1,0 +1,10 @@
+# build file and directory
+dist/
+build/
+*.pyc
+
+# test file
+*.png
+*.PNG
+*.jpg
+*.JPG

@@ -1,137 +1,26 @@
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
+from numpy import ndarray
+
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout,
-    QMainWindow, QFileDialog,
+    QMainWindow,
     QWidget, QToolBar, QLayout, QGridLayout,
-    QLabel, QLineEdit, QPushButton, QTableWidget, QHeaderView,
+    QLabel, QPushButton, QTableWidget, QHeaderView,
     QTabWidget
     # QListWidgetItem
     # QMessageBox, QFileDialog, QDialog
 )
 
-from utils.system import Path
 from utils import image_process
 from ui.process import (
-    Process_User_Interface,
-    Resize_Block, Flip_Block, Remove_Background_Block,  # Rotate_Block
+    Process_UI,
+    Resize_Block, Flip_Block, Remove_Background_Block, Rotate_Block
 )
 from ui.ui_utils.widget import (
-    Horizontal_Line, Vertical_Line, Titled_Block, Image_Widget)
-
-
-class Image_in_Directory_Viewer(Titled_Block):
-    def __init__(
-        self, data_type: str, default_dir: str, parent: QWidget | None = None
-    ) -> None:
-        if Path.Exist_check(default_dir, Path.Type.DIR):
-            self.file_dir: str = default_dir
-        else:
-            self.file_dir: str = Path.WORK_SPACE
-        self.file_list: list[str] = []
-
-        super().__init__(
-            data_type,
-            [
-                QPushButton("Set directory"),
-                QPushButton("Refresh")
-            ],
-            parent
-        )
-
-        self.img_widget: Image_Widget
-        self.file_table_widget: QTableWidget
-
-    def _Title_init(
-            self, title: str, process_btn: list[QPushButton]) -> QHBoxLayout:
-        _title = QHBoxLayout()
-        _title.setContentsMargins(5, 0, 0, 0)
-
-        _title.addWidget(
-            QLabel(f"{title} directory"), 1, Qt.AlignmentFlag.AlignLeft)
-        _dir_edit = QLineEdit()
-        _dir_edit.setPlaceholderText(self.file_dir)
-        _title.addWidget(_dir_edit, 999)
-
-        for _btn in process_btn:
-            _title.addWidget(_btn, 1, Qt.AlignmentFlag.AlignRight)
-            _btn.clicked.connect(getattr(self, _btn.text().replace(" ", "_")))
-
-            # self.__dict__.
-
-        return _title
-
-    def _Contents_init(self) -> QLayout:
-        _layout = QVBoxLayout()
-        _layout.setContentsMargins(0, 0, 0, 0)
-
-        _file_info_list = [
-            "file", "is_read", "size"
-        ]
-        _len_info = len(_file_info_list)
-        _file_table_widget = QTableWidget(self)
-        _file_table_widget.verticalHeader().setVisible(False)
-        _file_table_widget.setColumnCount(_len_info)
-        _ = [
-            _file_table_widget.horizontalHeader().setSectionResizeMode(
-                _ct, QHeaderView.ResizeMode.Stretch if (
-                    not _ct
-                ) else QHeaderView.ResizeMode.ResizeToContents
-            ) for _ct in range(_len_info)
-        ]
-        _file_table_widget.setHorizontalHeaderLabels(_file_info_list)
-        _file_table_widget.currentCellChanged.connect(self.Selected)
-        _layout.addWidget(_file_table_widget, 1)
-
-        _img_widget = Image_Widget()
-        _layout.addWidget(_img_widget, 5)
-
-        self.img_widget = _img_widget
-        self.file_table_widget = _file_table_widget
-
-        self.Refresh()
-
-        return _layout
-
-    def Set_directory(self):
-        _new_dir = QFileDialog.getExistingDirectory(
-            self, f"select the {self.title} directry", self.file_dir)
-
-        self.file_dir = _new_dir
-        self.Refresh()
-
-    def Refresh(self):
-        _default_dir = self.file_dir
-        _new_files = Path.Search(
-            _default_dir, Path.Type.FILE, ext_filter=["jpg", "png"])
-
-        _table = self.file_table_widget
-        _table.clearContents()
-        _table.setRowCount(len(_new_files))
-
-        for _ct, _file in enumerate(_new_files):
-            _file_name = Path.Get_file_directory(_file)[-1]
-
-            _table.setCellWidget(_ct, 0, QLabel(_file_name))
-            _table.setCellWidget(_ct, 1, QLabel("False"))
-            _table.setCellWidget(_ct, 2, QLabel())
-
-        if _new_files:
-            _table.setCurrentCell(0, 0)
-        self.file_list = _new_files
-
-    def Selected(self, row: int, colum: int, pre_row: int, pre_colum: int):
-        _table = self.file_table_widget
-        _img_widget = self.img_widget
-
-        if _table.currentColumn() >= 0:
-            _img_widget.Set_img(Path.Join(
-                _table.cellWidget(row, 0).text(),
-                self.file_dir
-            ))
-        else:
-            _img_widget.clear()
+    Horizontal_Line, Vertical_Line, Titled_Block,
+    Custom_Basewidget, Image_Display_with_Dir_n_Table)
 
 
 class Image_Process_Edit(Titled_Block):
@@ -139,7 +28,7 @@ class Image_Process_Edit(Titled_Block):
     Apply_process: Signal = Signal(list)
 
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__("Image Process", [], parent)
+        super().__init__("Image Process", (), parent)
 
         self.process_table: QTableWidget
         self.process_list = []
@@ -175,15 +64,27 @@ class Image_Process_Edit(Titled_Block):
 
         # process tab
         _process_tab = QTabWidget(self)
-        _process_list: list[Process_User_Interface] = [
+        _process_list: list[Process_UI | list[Process_UI]] = [
             Resize_Block(),
-            Flip_Block(),
-            # Rotate_Block(),
+            [Flip_Block(), Rotate_Block()],
             Remove_Background_Block()
         ]
         for _w in _process_list:
-            _w.Add_process.connect(self.Add)
-            _process_tab.addTab(_w, _w.title)
+            if isinstance(_w, list):
+                _widget = QWidget()
+                _title: str = ""
+
+                _temp_layout = QVBoxLayout()
+                for _com in _w:
+                    _temp_layout.addWidget(_com, 1)
+                    _com.Add_process.connect(self.Add)
+                    _title = f"{_title}, {_com.title}"
+
+                _widget.setLayout(_temp_layout)
+                _process_tab.addTab(_widget, _title[2:])
+            else:
+                _w.Add_process.connect(self.Add)
+                _process_tab.addTab(_w, _w.title)
         _layout.addWidget(_process_tab, 2)
 
         # process table
@@ -220,6 +121,86 @@ class Image_Process_Edit(Titled_Block):
         return _layout
 
 
+class Image_File_Display(Custom_Basewidget):
+    def __init__(self, parent: QWidget | None = None, **kwarg) -> None:
+        self.input_list: list[tuple[str, ndarray, tuple[int, int], bool]]
+        self.output_list: list[tuple[str, ndarray, tuple[int, int], bool]]
+
+        self.input_ui: Image_Display_with_Dir_n_Table
+        self.output_ui: Image_Display_with_Dir_n_Table
+        super().__init__(parent, **kwarg)
+
+    def _User_interface_init(self) -> QLayout:
+        _main_layout = QHBoxLayout()
+        _input_ui = Image_Display_with_Dir_n_Table(
+            "input", ".\\data\\input", 500, self)
+        _input_ui.is_refreshed.connect(self._Get_input_data)
+        _input_ui.Refresh()
+
+        _input_table = _input_ui.file_table_widget
+        _input_table.currentCellChanged.connect(
+            self._Select_the_input_img)
+        _input_table.cellDoubleClicked.connect(
+            self._Call_process_page)
+        _main_layout.addWidget(_input_ui, 99)
+
+        _main_layout.addWidget(Vertical_Line(), 1)
+
+        _output_ui = Image_Display_with_Dir_n_Table(
+            "output", ".\\data\\output", 500, self)
+        _output_ui.is_refreshed.connect(self._Get_output_data)
+        _output_ui.Refresh()
+        _output_table = _output_ui.file_table_widget
+        _output_table.currentCellChanged.connect(
+            self._Select_the_output_img)
+        _output_table.cellDoubleClicked.connect(
+            self._Call_process_page)
+        _main_layout.addWidget(_output_ui, 99)
+
+        self.input_ui = _input_ui
+        self.output_ui = _output_ui
+
+        return _main_layout
+
+    def _Get_input_data(
+        self,
+        data: list[tuple[str, ndarray, tuple[int, int], bool]]
+    ):
+        self.input_list = data
+
+    def _Get_output_data(
+        self,
+        data: list[tuple[str, ndarray, tuple[int, int], bool]]
+    ):
+        self.output_list = data
+
+    def _Select_the_input_img(
+            self, row: int):
+        _input_widget = self.input_ui.img_widget
+        _input_list = self.input_list
+
+        if row >= 0:
+            _input_widget.Set_img(_input_list[row][1])
+
+            _output_table = self.output_ui.file_table_widget
+            if _output_table.rowCount() >= (row + 1):
+                _output_table.setCurrentCell(row, 0)
+        else:
+            _input_widget.clear()
+
+    def _Select_the_output_img(
+            self, row: int):
+        _output_widget = self.output_ui.img_widget
+        _output_list = self.output_list
+        if row >= 0:
+            _output_widget.Set_img(_output_list[row][1])
+        else:
+            _output_widget.clear()
+
+    def _Call_process_page(self):
+        ...
+
+
 class Main_Page(QMainWindow):
     def __init__(
         self,
@@ -238,8 +219,7 @@ class Main_Page(QMainWindow):
             self.addToolBar(_toolbar)
         self.setGeometry(*position)
 
-        self.input_ui: Image_in_Directory_Viewer
-        self.output_ui: Image_in_Directory_Viewer
+        self.img_display: Image_File_Display
 
     def _Set_tool_bar(
         self, default_opt: dict[str, dict[str, Any]] | None = None
@@ -248,26 +228,19 @@ class Main_Page(QMainWindow):
 
     def _Set_main_widget(self) -> QWidget:
         _main_widget = QWidget(self)
-        _main_layout = QGridLayout(_main_widget)
+        _main_layout = QVBoxLayout(_main_widget)
 
         _img_process_edit = Image_Process_Edit(_main_widget)
         _img_process_edit.Apply_process.connect(self.Image_process)
-        _main_layout.addWidget(_img_process_edit, 0, 0, 1, 3)
+        _main_layout.addWidget(_img_process_edit, 15)
 
-        _main_layout.addWidget(Horizontal_Line(), 1, 0, 1, 3)
+        _main_layout.addWidget(Horizontal_Line(), 1)
 
-        _input_ui = Image_in_Directory_Viewer(
-            "input", "./data/input", _main_widget)
-        _main_layout.addWidget(_input_ui, 2, 0, 999, 1)
-        _main_layout.addWidget(Vertical_Line(), 2, 1, 999, 1)
-        _output_ui = Image_in_Directory_Viewer(
-            "output", "./data/output", _main_widget)
-        _main_layout.addWidget(_output_ui, 2, 2, 999, 1)
-
+        _file_dis_display = Image_File_Display(self)
+        _main_layout.addWidget(_file_dis_display, 150)
         _main_widget.setLayout(_main_layout)
 
-        self.input_ui = _input_ui
-        self.output_ui = _output_ui
+        self.img_display = _file_dis_display
 
         return _main_widget
 

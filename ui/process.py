@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget, QLayout, QGridLayout,
-    QLabel, QComboBox, QPushButton, QCheckBox,
+    QLabel, QComboBox, QCheckBox,
     # QListWidgetItem
     # QMessageBox, QFileDialog, QDialog
 )
@@ -29,21 +29,28 @@ class Basement(QWidget):
         raise NotImplementedError
 
 
-class Process_User_Interface(Titled_Block):
+class Process_UI(Titled_Block):
     # signal
     Add_process: Signal = Signal(dict)
+
+    def __init__(
+        self,
+        title: str,
+        parent: QWidget | None = None
+    ) -> None:
+        super().__init__(title, ("Add", ), parent)
 
     def Add(self):
         raise NotImplementedError
 
 
-class Resize_Block(Process_User_Interface):
+class Resize_Block(Process_UI):
     def __init__(self, parent: QWidget | None = None) -> None:
         self.h_size_edit: Num_edit
         self.w_size_edit: Num_edit
         self.interpolation_combo: QComboBox
 
-        super().__init__("Resize", [QPushButton("Add")], parent)
+        super().__init__("Resize", parent)
 
     def _Contents_init(self) -> QLayout:
         _layout = QGridLayout()
@@ -84,12 +91,12 @@ class Resize_Block(Process_User_Interface):
         )
 
 
-class Flip_Block(Process_User_Interface):
+class Flip_Block(Process_UI):
     def __init__(self, parent: QWidget | None = None) -> None:
         self.v_flip_check: QCheckBox
         self.h_flip_check: QCheckBox
 
-        super().__init__("Flip", [QPushButton("Add")], parent)
+        super().__init__("Flip", parent)
 
     def _Contents_init(self):
         _layout = QGridLayout()
@@ -117,9 +124,9 @@ class Flip_Block(Process_User_Interface):
         )
 
 
-class Rotate_Block(Process_User_Interface):
+class Rotate_Block(Process_UI):
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__("Rotate", [QPushButton("Add")], parent)
+        super().__init__("Rotate", parent)
 
     def _Contents_init(self):
         _layout = QGridLayout()
@@ -130,9 +137,28 @@ class Rotate_Block(Process_User_Interface):
         ...
 
 
-class Remove_Background_Block(Process_User_Interface):
+class Mask_Block(Process_UI):
+    def __init__(
+        self,
+        title: str,
+        parent: QWidget | None = None
+    ) -> None:
+        super().__init__(title, parent)
+
+    def Add(self):
+        self.Add_process.emit(
+            {
+                "process": "masking",
+                "arg": {
+
+                }
+            }
+        )
+
+
+class Remove_Background_Block(Process_UI):
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__("Remove Background", [QPushButton("Add")], parent)
+        super().__init__("Remove Background", parent)
 
     def _Contents_init(self):
         _layout = QGridLayout()
