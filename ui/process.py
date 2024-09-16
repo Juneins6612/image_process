@@ -83,7 +83,7 @@ class Resize_Block(Process_UI):
     def Add(self):
         self.Add_process.emit(
             {
-                "process": "resize",
+                "process": "Resize",
                 "arg": {
                     "height": self.h_size_edit.value,
                     "width": self.w_size_edit.value,
@@ -119,7 +119,7 @@ class Flip_Block(Process_UI):
     def Add(self):
         self.Add_process.emit(
             {
-                "process": "flip",
+                "process": "Flip",
                 "arg": {
                     "vertical": self.v_flip_check.isChecked(),
                     "horizontal": self.h_flip_check.isChecked()
@@ -161,7 +161,7 @@ class Rotate_Block(Process_UI):
     def Add(self):
         self.Add_process.emit(
             {
-                "process": "rotate",
+                "process": "Rotate",
                 "arg": {
                     "rotate": self.rotate_edit.value,
                     "center_rate": (
@@ -202,7 +202,7 @@ class Mask_Block(Process_UI):
     def Add(self):
         self.Add_process.emit(
             {
-                "process": "masking",
+                "process": "Masking",
                 "arg": {
                     "mask": self.img_mask,
                     "is_positive": self.positive_check.isChecked()
@@ -235,7 +235,7 @@ class Background_Block(Process_UI):
     def Add(self):
         self.Add_process.emit(
             {
-                "process": "background masking",
+                "process": "Background_Masking",
                 "arg": {
                     "mode": self.mode_combobox.currentText(),
                     "is_positive": self.positive_check.isChecked()
@@ -302,7 +302,7 @@ class Crop(Process_UI):
     def Add(self):
         self.Add_process.emit(
             {
-                "process": "crop",
+                "process": "Crop",
                 "arg": {
                     "is_auto": self.auto_check.isChecked(),
                     "lt_position_rate": (

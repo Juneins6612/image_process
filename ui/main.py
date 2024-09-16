@@ -84,7 +84,9 @@ class Image_Process_Edit(Titled_Block):
         _apply_btn = QPushButton("Apply")
         _apply_btn.clicked.connect(self.Apply)
         _remove_btn = QPushButton("remove")
+        _remove_btn.clicked.connect(self.Remove)
         _clear_btn = QPushButton("clear")
+        _clear_btn.clicked.connect(self.Clear)
 
         _table_layout.addWidget(_process_table, 0, 0, 4, 3)
         _table_layout.addWidget(_apply_btn, 4, 0)
@@ -97,36 +99,51 @@ class Image_Process_Edit(Titled_Block):
         return _layout
 
     def Add(self, argument: dict):
-        _process_name: str = argument["process"]
-
-        _process_name = " ".join([
-            _comp.capitalize() for _comp in _process_name.split(" ")])
-        _process_name = _process_name.replace(" ", "_")
-
-        _arg: dict[str, Any] = argument["arg"]
-
-        self.process_list.append({
-            "process": _process_name,
-            "arg": _arg
-        })
+        self.process_list.append(argument)
 
         _table = self.process_table
         _this_ct = _table.rowCount()
         _table.setRowCount(_this_ct + 1)
 
-        _table.setItem(_this_ct, 0, QTableWidgetItem(_process_name))
+        _table.setItem(_this_ct, 0, QTableWidgetItem(argument["process"]))
         _table.setItem(_this_ct, 1, QTableWidgetItem(
-            " ".join(f"{_k}: {_v}" for _k, _v in _arg.items())
+            " ".join(f"{_k}: {_v}" for _k, _v in argument["arg"].items())
         ))
 
     def Apply(self):
         self.Apply_process.emit(self.process_list)
 
     def Remove(self):
-        ...
+        _table = self.process_table
+        _process_list = self.process_list
+        _selected = _table.selectedRanges()
+
+        _selected_list = []
+
+        for _range in _selected:
+            _t = _range.topRow()
+            _b = _range.bottomRow()
+
+            if _t == _b:
+                _selected_list.append(_t)
+            else:
+                _selected_list += list(
+                    range(_range.topRow(), _range.bottomRow() + 1))
+
+        _selected_list = sorted(_selected_list, reverse=True)
+
+        for _pick_ct in _selected_list:
+            del _process_list[_pick_ct]
+
+        self.Clear()
+
+        for _data in _process_list:
+            self.Add(_data)
 
     def Clear(self):
-        ...
+        self.process_list = []
+        self.process_table.clearContents()
+        self.process_table.setRowCount(0)
 
 
 class Image_File_Display(Custom_Basewidget):
