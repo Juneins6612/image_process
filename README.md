@@ -8,9 +8,9 @@ This project is designed to create a tool for processing images on a local termi
 
 - [ ] Support new process
   - [X] Remove Background -> [Code Source](https://github.com/danielgatis/rembg)
-  - [ ] Rotate
+  - [X] Rotate
   - [ ] Image shift
-  - [ ] Crop
+  - [X] Crop
 
 - [ ] Graphic User Interface
   - [ ] Edit image process for each images.
