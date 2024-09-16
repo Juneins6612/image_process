@@ -7,16 +7,17 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QVBoxLayout,
     QMainWindow,
     QWidget, QToolBar, QLayout, QGridLayout,
-    QLabel, QPushButton, QTableWidget, QHeaderView,
+    QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QTabWidget
     # QListWidgetItem
     # QMessageBox, QFileDialog, QDialog
 )
 
-from utils import image_process
+from utils.image_process import Apply_Block
 from ui.process import (
     Process_UI,
-    Resize_Block, Flip_Block, Remove_Background_Block, Rotate_Block
+    Resize_Block, Crop, Flip_Block, Mask_Block,
+    Background_Block, Rotate_Block
 )
 from ui.ui_utils.widget import (
     Horizontal_Line, Vertical_Line, Titled_Block,
@@ -33,55 +34,30 @@ class Image_Process_Edit(Titled_Block):
         self.process_table: QTableWidget
         self.process_list = []
 
-    def Apply(self):
-        self.Apply_process.emit(self.process_list)
-
-    def Add(self, argument: dict):
-        _process_name: str = argument["process"]
-        _process_name = _process_name.capitalize()
-        _process_name = _process_name.replace(" ", "_")
-
-        _arg: dict[str, Any] = argument["arg"]
-
-        self.process_list.append({
-            "process": _process_name,
-            "arg": _arg
-        })
-
-        _table = self.process_table
-        _this_ct = _table.rowCount()
-        _table.setRowCount(_this_ct + 1)
-
-        _table.setCellWidget(_this_ct, 0, QLabel(_process_name))
-        _table.setCellWidget(
-            _this_ct,
-            1,
-            QLabel(
-                "".join(f"{_k}: {_v}" for _k, _v in _arg.items())))
-
     def _Contents_init(self):
         _layout = QHBoxLayout()
 
         # process tab
         _process_tab = QTabWidget(self)
         _process_list: list[Process_UI | list[Process_UI]] = [
-            Resize_Block(),
-            [Flip_Block(), Rotate_Block()],
-            Remove_Background_Block()
+            Resize_Block(self),
+            Rotate_Block(self),
+            Crop(self),
+            Flip_Block(self),
+            [Mask_Block(self), Background_Block(self)]
         ]
         for _w in _process_list:
             if isinstance(_w, list):
                 _widget = QWidget()
-                _title: str = ""
+                _title: str = _w[0].title
 
                 _temp_layout = QVBoxLayout()
                 for _com in _w:
                     _temp_layout.addWidget(_com, 1)
                     _com.Add_process.connect(self.Add)
-                    _title = f"{_title}, {_com.title}"
 
                 _widget.setLayout(_temp_layout)
-                _process_tab.addTab(_widget, _title[2:])
+                _process_tab.addTab(_widget, _title)
             else:
                 _w.Add_process.connect(self.Add)
                 _process_tab.addTab(_w, _w.title)
@@ -120,28 +96,55 @@ class Image_Process_Edit(Titled_Block):
 
         return _layout
 
+    def Add(self, argument: dict):
+        _process_name: str = argument["process"]
+
+        _process_name = " ".join([
+            _comp.capitalize() for _comp in _process_name.split(" ")])
+        _process_name = _process_name.replace(" ", "_")
+
+        _arg: dict[str, Any] = argument["arg"]
+
+        self.process_list.append({
+            "process": _process_name,
+            "arg": _arg
+        })
+
+        _table = self.process_table
+        _this_ct = _table.rowCount()
+        _table.setRowCount(_this_ct + 1)
+
+        _table.setItem(_this_ct, 0, QTableWidgetItem(_process_name))
+        _table.setItem(_this_ct, 1, QTableWidgetItem(
+            " ".join(f"{_k}: {_v}" for _k, _v in _arg.items())
+        ))
+
+    def Apply(self):
+        self.Apply_process.emit(self.process_list)
+
+    def Remove(self):
+        ...
+
+    def Clear(self):
+        ...
+
 
 class Image_File_Display(Custom_Basewidget):
     def __init__(self, parent: QWidget | None = None, **kwarg) -> None:
-        self.input_list: list[tuple[str, ndarray, tuple[int, int], bool]]
-        self.output_list: list[tuple[str, ndarray, tuple[int, int], bool]]
+        self.apply_blocks: list[Apply_Block] = []
 
         self.input_ui: Image_Display_with_Dir_n_Table
         self.output_ui: Image_Display_with_Dir_n_Table
         super().__init__(parent, **kwarg)
+
+        self.input_ui.Refresh()
+        self.output_ui.Refresh()
 
     def _User_interface_init(self) -> QLayout:
         _main_layout = QHBoxLayout()
         _input_ui = Image_Display_with_Dir_n_Table(
             "input", ".\\data\\input", 500, self)
         _input_ui.is_refreshed.connect(self._Get_input_data)
-        _input_ui.Refresh()
-
-        _input_table = _input_ui.file_table_widget
-        _input_table.currentCellChanged.connect(
-            self._Select_the_input_img)
-        _input_table.cellDoubleClicked.connect(
-            self._Call_process_page)
         _main_layout.addWidget(_input_ui, 99)
 
         _main_layout.addWidget(Vertical_Line(), 1)
@@ -149,38 +152,63 @@ class Image_File_Display(Custom_Basewidget):
         _output_ui = Image_Display_with_Dir_n_Table(
             "output", ".\\data\\output", 500, self)
         _output_ui.is_refreshed.connect(self._Get_output_data)
-        _output_ui.Refresh()
-        _output_table = _output_ui.file_table_widget
-        _output_table.currentCellChanged.connect(
-            self._Select_the_output_img)
-        _output_table.cellDoubleClicked.connect(
-            self._Call_process_page)
         _main_layout.addWidget(_output_ui, 99)
 
         self.input_ui = _input_ui
         self.output_ui = _output_ui
 
+        _input_table = _input_ui.file_table_widget
+        _input_ui.Refresh()
+        _input_table.currentCellChanged.connect(self._Select_the_input_img)
+        _input_table.cellDoubleClicked.connect(self._Call_process_page)
+        _output_ui.Refresh()
+        _output_table = _output_ui.file_table_widget
+        _output_table.currentCellChanged.connect(self._Select_the_output_img)
+        _output_table.cellDoubleClicked.connect(self._Call_process_page)
+
         return _main_layout
 
     def _Get_input_data(
         self,
-        data: list[tuple[str, ndarray, tuple[int, int], bool]]
+        data: list[tuple[str, ndarray]]
     ):
-        self.input_list = data
+        _save_dir = self.output_ui.file_dir
+
+        self.apply_blocks = [
+            Apply_Block(
+                _save_dir, _file_name, _img) for _file_name, _img in data
+        ]
 
     def _Get_output_data(
         self,
-        data: list[tuple[str, ndarray, tuple[int, int], bool]]
+        data: list[tuple[str, ndarray]]
     ):
-        self.output_list = data
+        _apply_list = self.apply_blocks
+        _apply_ids = list(range(len(_apply_list)))
+        _data_ids = list(range(len(data)))
 
-    def _Select_the_input_img(
-            self, row: int):
+        _rm_ct = 0
+
+        for _data_ct, (_file_name, _img) in enumerate(data):
+            for _apply_ct, _apply_id in enumerate(_apply_ids):
+                _this_block = _apply_list[_apply_id]
+
+                if _this_block.file_name == _file_name:
+                    _this_block.output_img = _img
+
+                    _apply_ids.pop(_apply_ct)
+                    _data_ids.pop(_data_ct - _rm_ct)
+                    _rm_ct += 1
+                    break
+
+        self.output_ui.Remove(_data_ids)
+
+    def _Select_the_input_img(self, row: int):
         _input_widget = self.input_ui.img_widget
-        _input_list = self.input_list
+        _pick_img = self.apply_blocks[row].input_img
 
-        if row >= 0:
-            _input_widget.Set_img(_input_list[row][1])
+        if row >= 0 and len(_pick_img.shape) >= 2:
+            _input_widget.Set_img(_pick_img)
 
             _output_table = self.output_ui.file_table_widget
             if _output_table.rowCount() >= (row + 1):
@@ -188,14 +216,21 @@ class Image_File_Display(Custom_Basewidget):
         else:
             _input_widget.clear()
 
-    def _Select_the_output_img(
-            self, row: int):
+    def _Select_the_output_img(self, row: int):
         _output_widget = self.output_ui.img_widget
-        _output_list = self.output_list
-        if row >= 0:
-            _output_widget.Set_img(_output_list[row][1])
+        _pick_img = self.apply_blocks[row].output_img
+
+        if row >= 0 and len(_pick_img.shape) >= 2:
+            _output_widget.Set_img(_pick_img)
         else:
             _output_widget.clear()
+
+    def Get_process_info(self, process_arg_list: list[dict]):
+        for _block in self.apply_blocks:
+            _block.Set_process(process_arg_list)
+            _block()
+
+        self.output_ui.Refresh()
 
     def _Call_process_page(self):
         ...
@@ -231,7 +266,6 @@ class Main_Page(QMainWindow):
         _main_layout = QVBoxLayout(_main_widget)
 
         _img_process_edit = Image_Process_Edit(_main_widget)
-        _img_process_edit.Apply_process.connect(self.Image_process)
         _main_layout.addWidget(_img_process_edit, 15)
 
         _main_layout.addWidget(Horizontal_Line(), 1)
@@ -240,30 +274,9 @@ class Main_Page(QMainWindow):
         _main_layout.addWidget(_file_dis_display, 150)
         _main_widget.setLayout(_main_layout)
 
+        _img_process_edit.Apply_process.connect(
+            _file_dis_display.Get_process_info)
+
         self.img_display = _file_dis_display
 
         return _main_widget
-
-    def Image_process(self, process_arg_list: list[dict]):
-        _img_table = self.input_ui.file_table_widget
-        _img_viewer = self.input_ui.img_widget
-        _save_dir = self.output_ui.file_dir
-        _img_ct = _img_table.rowCount()
-
-        for _ct in range(_img_ct):
-            _img_table.setCurrentCell(_ct, 0)
-            _img = _img_viewer.img.copy()
-            _file_name: str = _img_table.cellWidget(_ct, 0).text()
-
-            for _process in process_arg_list:
-                _process_name = _process["process"]
-                _process_kwagr = _process["arg"]
-
-                _img = image_process.__dict__[_process_name](
-                    _img,
-                    **_process_kwagr
-                )
-
-            image_process.Write(_img, _save_dir, _file_name)
-
-        self.output_ui.Refresh()

@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from utils.system import Path
-from utils.image_process import Read
+from utils.image_process import Process
 
 
 class Horizontal_Line(QFrame):
@@ -27,6 +27,33 @@ class Vertical_Line(QFrame):
         super().__init__(parent)
         self.setFrameShape(QFrame.Shape.VLine)
         self.setFrameShadow(QFrame.Shadow.Sunken)
+
+
+class Labeling(QHBoxLayout):
+    def __init__(
+        self,
+        label: str | QLabel,
+        objects: list[QWidget | QLayout],
+        spacing_mode: str = "empty",
+        space_rate: int = 99,
+        parent: QWidget | None = None
+    ):
+        super().__init__(parent)
+        if isinstance(label, str):
+            self.addWidget(QLabel(label), 1, Qt.AlignmentFlag.AlignLeft)
+        else:
+            self.addWidget(label, 1, Qt.AlignmentFlag.AlignLeft)
+
+        if space_rate:
+            _spacing = QWidget() if (
+                spacing_mode == "empty") else Horizontal_Line()
+            self.addWidget(_spacing, space_rate)
+
+        for _obj in objects:
+            if isinstance(_obj, QHBoxLayout):
+                self.addLayout(_obj, 1)
+            else:
+                self.addWidget(_obj, 1, Qt.AlignmentFlag.AlignRight)
 
 
 class Custom_Basewidget(QWidget):
@@ -53,20 +80,24 @@ class Titled_Block(Custom_Basewidget):
         super().__init__(parent, title=title, process_btn=process_btn)
 
     def _Title_init(
-            self, title: str, process_btn: tuple[str, ...]) -> QHBoxLayout:
+        self, title: str, process_btn: tuple[str, ...]
+    ) -> QHBoxLayout:
+
         _title_layout = QHBoxLayout()
-        _title_layout.setContentsMargins(5, 0, 0, 0)
-
         _title_label = QLabel(title, self)
-
-        _title_layout.addWidget(
-            _title_label, 1, Qt.AlignmentFlag.AlignLeft)
-        _title_layout.addWidget(Horizontal_Line(), 999)
+        _btn_list = []
 
         for _btn_string in process_btn:
             _btn = QPushButton(_btn_string, self)
-            _title_layout.addWidget(_btn, 1, Qt.AlignmentFlag.AlignRight)
             _btn.clicked.connect(getattr(self, _btn_string.replace(" ", "_")))
+            _btn_list.append(_btn)
+
+        _title_layout = Labeling(
+            _title_label,
+            _btn_list,
+            "line"
+        )
+        _title_layout.setContentsMargins(5, 0, 0, 0)
 
         self.title_label = _title_label
         return _title_layout
@@ -77,9 +108,9 @@ class Titled_Block(Custom_Basewidget):
     def _User_interface_init(
         self, title: str = "title", process_btn: tuple[str, ...] = ()
     ) -> QLayout:
-        _title = self._Title_init(title, process_btn)
         _contents = self._Contents_init()
         _contents.setContentsMargins(15, 0, 10, 0)
+        _title = self._Title_init(title, process_btn)
 
         _layout = QVBoxLayout()
         _layout.setContentsMargins(0, 0, 0, 0)
@@ -183,7 +214,7 @@ class Image_Viewer(QLabel):
 
 
 class Image_Display_with_Dir_n_Table(Titled_Block):
-    is_refreshed = Signal(list)  # (file_name, image, image size, is processed)
+    is_refreshed = Signal(list)  # (file_name, image)
 
     def __init__(
         self,
@@ -228,7 +259,7 @@ class Image_Display_with_Dir_n_Table(Titled_Block):
         _layout.setContentsMargins(0, 0, 0, 0)
 
         _file_info_list = [
-            "file", "size", "is_applyed"
+            "file", "size", "is_applied"
         ]
         _len_info = len(_file_info_list)
         _file_table_widget = QTableWidget(self)
@@ -256,7 +287,7 @@ class Image_Display_with_Dir_n_Table(Titled_Block):
 
     def Set_directory(self):
         _new_dir = QFileDialog.getExistingDirectory(
-            self, f"select the {self.title} directry", self.file_dir)
+            self, f"select the {self.title} directory", self.file_dir)
 
         self.file_dir = _new_dir
         self.Refresh()
@@ -275,7 +306,7 @@ class Image_Display_with_Dir_n_Table(Titled_Block):
         for _ct, _file in enumerate(_new_files):
             _file_name = Path.Get_file_directory(_file)[-1]
 
-            _img = Read(_file)
+            _img = Process.Read(_file)
             _shape = _img.shape[:2]
 
             _str_list = [_file_name, f"{_shape[0]}, {_shape[1]}", "False"]
@@ -285,9 +316,7 @@ class Image_Display_with_Dir_n_Table(Titled_Block):
 
             _read_data.append((
                 _file_name,
-                _img,
-                _shape,
-                "False"
+                _img
             ))
 
         if _new_files:
@@ -296,26 +325,54 @@ class Image_Display_with_Dir_n_Table(Titled_Block):
 
         self.is_refreshed.emit(_read_data)
 
+    def Remove(self, row_num_list: list[int]):
+        _table = self.file_table_widget
+        for _id in sorted(row_num_list, reverse=True):
+            for _col_ct in range(_table.columnCount()):
+                _table.takeItem(_id, _col_ct)
+
+        _table.setRowCount(_table.rowCount() - len(row_num_list))
+
+        if not _table.rowCount():
+            self.img_widget.clear()
+
 
 class Num_edit(QLineEdit):
     def __init__(
         self,
         default_value: int | float = -1,
+        max_limit: int | float | None = None,
+        min_limit: int | float | None = None,
         parent: QWidget | None = None
     ) -> None:
         super().__init__(parent)
 
         self.default_value = default_value
         self.value: int | float = default_value
-        self.setPlaceholderText(str(default_value))
-        self.textEdited.connect(self.Value_checker)
 
-    def Value_checker(self, text: str):
+        self.max_limit = max_limit
+        self.min_limit = min_limit
+
+        self.setPlaceholderText(str(default_value))
+        self.editingFinished.connect(self.Value_checker)
+
+    def Value_checker(self):
+        text = self.text()
+
         try:
             if text == "":
                 self.value = self.default_value
             else:
-                self.value = type(self.value)(text)
+                _insert_v = type(self.value)(text)
+
+                _max_limit = self.max_limit
+                _insert_v = _insert_v if (
+                    _max_limit is None) else min(_insert_v, _max_limit)
+                _min_limit = self.min_limit
+                _insert_v = _insert_v if (
+                    _min_limit is None) else max(_insert_v, _min_limit)
+
+                self.value = _insert_v
             _text = str(self.value)
             self.setText(_text)
 
