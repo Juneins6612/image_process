@@ -239,8 +239,9 @@ class Image_Display_with_Dir_n_Table(Titled_Block):
         _title_layout = QHBoxLayout()
         _title_layout.setContentsMargins(5, 0, 0, 0)
 
+        _title_label = QLabel(f"{title} directory")
         _title_layout.addWidget(
-            QLabel(f"{title} directory"), 1, Qt.AlignmentFlag.AlignLeft)
+            _title_label, 1, Qt.AlignmentFlag.AlignLeft)
         _dir_edit = QLineEdit()
         _dir_edit.setPlaceholderText(self.file_dir)
         _title_layout.addWidget(_dir_edit, 999)
@@ -252,6 +253,7 @@ class Image_Display_with_Dir_n_Table(Titled_Block):
 
             # self.__dict__.
 
+        self.title_label = _title_label
         return _title_layout
 
     def _Contents_init(self) -> QLayout:
@@ -286,8 +288,9 @@ class Image_Display_with_Dir_n_Table(Titled_Block):
         return _layout
 
     def Set_directory(self):
+        _dir_type = self.title_label.text()
         _new_dir = QFileDialog.getExistingDirectory(
-            self, f"select the {self.title} directory", self.file_dir)
+            self, f"select the {_dir_type}", self.file_dir)
 
         self.file_dir = _new_dir
         self.Refresh()
